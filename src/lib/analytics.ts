@@ -43,4 +43,6 @@ export const EVENT = {
   recommendGenerated: "recommend_generated",
   qrImported: "qr_imported",
   dhlotteryOpened: "dhlottery_opened",
+  onboardingStep: "onboarding_step",
+  onboardingDone: "onboarding_done",
 } as const;
