@@ -97,9 +97,13 @@ function Shell() {
           본문과 탭은 위 컨테이너의 paddingBottom 만큼 올라와 있어서 가려지지 않아요. */}
       <div
         style={{
+          // position: fixed 는 #root 가 아니라 화면 기준이라, 넓은 화면에서는
+          // App.css 의 max-width 480px 를 벗어나 창 전체로 퍼져요. 직접 맞춰줍니다.
           position: "fixed",
-          left: 0,
-          right: 0,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "100%",
+          maxWidth: 480,
           bottom: 0,
           zIndex: 10,
           background: palette.bg,
