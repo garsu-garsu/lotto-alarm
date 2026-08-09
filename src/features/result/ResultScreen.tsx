@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { Button, Paragraph } from "@toss/tds-mobile";
+import { Device } from "@apps-in-toss/web-framework";
+import { Button, Paragraph, useToast } from "@toss/tds-mobile";
 
 import { LottoBalls } from "../../components/LottoBalls";
 import { Card, ScreenLayout } from "../../components/ScreenLayout";
@@ -11,11 +12,15 @@ import {
   msUntilNextDraw,
   type Draw,
 } from "../../lib/lotto";
+import { isInTossApp } from "../../lib/tossEnv";
 import { palette } from "../../theme";
+
+const DHLOTTERY_URL = "https://dhlottery.co.kr";
 
 const RANK_LABELS = ["1등", "2등", "3등", "4등", "5등"];
 
 export function ResultScreen() {
+  const { openToast } = useToast();
   const [draw, setDraw] = useState<Draw | null>(null);
   const [error, setError] = useState(false);
   // 다시 시도 버튼을 누르면 이 값을 올려서 아래 effect 를 다시 돌려요.
@@ -37,6 +42,19 @@ export function ResultScreen() {
     const timer = setInterval(() => setCountdown(formatCountdown(msUntilNextDraw())), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const openDhlottery = async () => {
+    track(EVENT.dhlotteryOpened, {});
+    try {
+      if (isInTossApp()) {
+        await Device.openURL(DHLOTTERY_URL);
+      } else {
+        window.open(DHLOTTERY_URL, "_blank", "noopener");
+      }
+    } catch {
+      openToast("동행복권 사이트를 열지 못했어요.");
+    }
+  };
 
   return (
     <ScreenLayout title="이번 주 당첨번호" subtitle={`다음 추첨까지 ${countdown}`}>
@@ -104,6 +122,17 @@ export function ResultScreen() {
           </Card>
         </>
       )}
+
+      <Card style={{ marginTop: 12 }}>
+        <Paragraph typography="t7" color={palette.sub}>
+          당첨결과와 판매점 정보를 공식 사이트에서 볼 수 있어요.
+        </Paragraph>
+        <div style={{ marginTop: 12 }}>
+          <Button display="full" variant="weak" color="dark" onClick={openDhlottery}>
+            동행복권 홈페이지 바로가기
+          </Button>
+        </div>
+      </Card>
     </ScreenLayout>
   );
 }

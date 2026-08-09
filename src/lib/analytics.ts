@@ -42,4 +42,5 @@ export const EVENT = {
   myNumbersChecked: "my_numbers_checked",
   recommendGenerated: "recommend_generated",
   qrImported: "qr_imported",
+  dhlotteryOpened: "dhlottery_opened",
 } as const;
