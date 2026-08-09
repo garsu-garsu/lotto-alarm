@@ -11,9 +11,11 @@ import {
   agreedCheckSlot,
   canRequestNotifyConsent,
 } from "../../data/notify";
+import { useTourTarget } from "../../lib/tour";
 import { palette } from "../../theme";
 
 export function AlarmScreen() {
+  const coachRef = useTourTarget("alarm-slots");
   const [buy, setBuy] = useState(agreedBuySlot);
   const [check, setCheck] = useState(agreedCheckSlot);
 
@@ -27,13 +29,15 @@ export function AlarmScreen() {
         </Card>
       )}
 
-      <NotifySlotCard
-        title="로또 사라고 알려드릴 시각"
-        slots={BUY_SLOTS}
-        agreedCode={buy}
-        onAgreed={setBuy}
-        where="alarm"
-      />
+      <div ref={coachRef}>
+        <NotifySlotCard
+          title="로또 사라고 알려드릴 시각"
+          slots={BUY_SLOTS}
+          agreedCode={buy}
+          onAgreed={setBuy}
+          where="alarm"
+        />
+      </div>
       <NotifySlotCard
         title="번호 확인하라고 알려드릴 시각"
         slots={CHECK_SLOTS}

@@ -7,6 +7,7 @@ import { Card, ScreenLayout } from "../../components/ScreenLayout";
 import { useAdGate } from "../../hooks/useAdGate";
 import { EVENT, track } from "../../lib/analytics";
 import { recommendGames, STRATEGIES, type Strategy } from "../../lib/recommend";
+import { useTourTarget } from "../../lib/tour";
 import { palette } from "../../theme";
 
 const LABELS = ["A", "B", "C", "D", "E"];
@@ -15,6 +16,7 @@ type Results = Record<Strategy, number[][] | null>;
 
 export function RecommendScreen() {
   const { watchThen } = useAdGate();
+  const coachRef = useTourTarget("recommend-card");
   const [results, setResults] = useState<Results>({
     uniform: null,
     lessCrowded: null,
@@ -39,10 +41,10 @@ export function RecommendScreen() {
         </Paragraph>
       </Card>
 
-      {STRATEGIES.map(({ key, label, summary, basis, effect }) => {
+      {STRATEGIES.map(({ key, label, summary, basis, effect }, index) => {
         const games = results[key];
-        return (
-          <Card key={key} style={{ marginTop: 12 }}>
+        const card = (
+          <Card style={{ marginTop: 12 }}>
             <Paragraph typography="t6" fontWeight="bold" color={palette.ink}>
               {label}
             </Paragraph>
@@ -75,6 +77,13 @@ export function RecommendScreen() {
               </Button>
             </div>
           </Card>
+        );
+        return index === 0 ? (
+          <div key={key} ref={coachRef}>
+            {card}
+          </div>
+        ) : (
+          <div key={key}>{card}</div>
         );
       })}
     </ScreenLayout>

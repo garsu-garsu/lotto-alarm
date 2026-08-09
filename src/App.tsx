@@ -1,17 +1,17 @@
 import { closeView, graniteEvent } from "@apps-in-toss/web-framework";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import "./App.css";
 import { BannerAd } from "./components/BannerAd";
 import { BottomNav } from "./components/BottomNav";
+import { CoachMark } from "./components/CoachMark";
 import { AlarmScreen } from "./features/alarm/AlarmScreen";
 import { MyNumbersScreen } from "./features/mynumbers/MyNumbersScreen";
-import { OnboardingScreen } from "./features/onboarding/OnboardingScreen";
 import { RecommendScreen } from "./features/recommend/RecommendScreen";
 import { ResultScreen } from "./features/result/ResultScreen";
 import { trackScreen } from "./lib/analytics";
-import { isOnboarded, markOnboarded } from "./lib/onboarding";
 import { RouterProvider, useRouter, type Route } from "./router";
+import { TourProvider, useTour } from "./lib/tour";
 import { palette } from "./theme";
 
 /** BannerAd 가 잡아두는 높이 — 본문이 배너 뒤로 숨지 않게 같은 값만큼 비워둬요. */
@@ -34,20 +34,31 @@ function CurrentScreen() {
 
 function Shell() {
   const { route, back, canGoBack, reset } = useRouter();
-
-  // 온보딩 여부. 단, 푸시 딥링크(기본 화면인 result 가 아님)로 들어왔으면
-  // 이미 쓰던 사람이니 온보딩 없이 바로 보여주고 그대로 완료 처리해요.
-  const [onboarded, setOnboarded] = useState(() => {
-    if (route.name !== "result") {
-      markOnboarded();
-      return true;
-    }
-    return isOnboarded();
-  });
+  const tour = useTour();
 
   useEffect(() => {
     trackScreen(route.name);
   }, [route.name]);
+
+  // 투어 진행 중이면 해당 단계의 탭으로 자동 이동해요. 이미 그 탭이면 그대로 둡니다.
+  useEffect(() => {
+    if (tour.current != null && route.name !== tour.current.route) {
+      reset({ name: tour.current.route } as Route);
+    }
+  }, [tour, route.name, reset]);
+
+  // 창 전체 클릭으로 다음 단계 — 건너뛰기 버튼 클릭은 여기서 가로채지 않고 그대로 통과시켜요.
+  useEffect(() => {
+    if (tour.current == null) return;
+    const onClick = (event: MouseEvent) => {
+      if ((event.target as HTMLElement | null)?.closest("[data-tour-skip]") != null) return;
+      event.preventDefault();
+      event.stopPropagation();
+      tour.next();
+    };
+    window.addEventListener("click", onClick, true);
+    return () => window.removeEventListener("click", onClick, true);
+  }, [tour]);
 
   // 토스 네이티브 상단 바 뒤로가기를 앱 내 이동에 연결
   useEffect(() => {
@@ -101,19 +112,19 @@ function Shell() {
       }}
     >
       <div style={{ flex: 1, minHeight: 0 }}>
-        {onboarded ? (
-          <CurrentScreen />
-        ) : (
-          <OnboardingScreen
-            onDone={(goToAlarm) => {
-              markOnboarded();
-              setOnboarded(true);
-              if (goToAlarm) reset({ name: "alarm" });
-            }}
-          />
-        )}
+        <CurrentScreen />
       </div>
-      {onboarded && <BottomNav />}
+      <BottomNav />
+
+      {tour.current != null && (
+        <CoachMark
+          targetRef={tour.current.targetRef}
+          message={tour.current.message}
+          index={tour.index}
+          total={tour.total}
+          onSkip={tour.skip}
+        />
+      )}
 
       {/* 배너는 화면마다 따로 두지 않고 여기 하나만 띄워요 — 앱 전체에 배너는 하나입니다.
           본문과 탭은 위 컨테이너의 paddingBottom 만큼 올라와 있어서 가려지지 않아요. */}
@@ -157,8 +168,11 @@ function initialRoute(): Route {
 
 function App() {
   return (
+    // 투어를 켤지 말지는 TourProvider 가 라우트(딥링크 여부)와 온보딩 기록을 보고 정해요.
     <RouterProvider initial={initialRoute()}>
-      <Shell />
+      <TourProvider>
+        <Shell />
+      </TourProvider>
     </RouterProvider>
   );
 }

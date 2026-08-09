@@ -13,6 +13,7 @@ import {
   type Draw,
 } from "../../lib/lotto";
 import { isInTossApp } from "../../lib/tossEnv";
+import { useTourTarget } from "../../lib/tour";
 import { palette } from "../../theme";
 
 const DHLOTTERY_URL = "https://dhlottery.co.kr";
@@ -21,6 +22,7 @@ const RANK_LABELS = ["1등", "2등", "3등", "4등", "5등"];
 
 export function ResultScreen() {
   const { openToast } = useToast();
+  const coachRef = useTourTarget("result-numbers");
   const [draw, setDraw] = useState<Draw | null>(null);
   const [error, setError] = useState(false);
   // 다시 시도 버튼을 누르면 이 값을 올려서 아래 effect 를 다시 돌려요.
@@ -77,14 +79,16 @@ export function ResultScreen() {
         </Card>
       ) : (
         <>
-          <Card style={{ marginTop: 8 }}>
-            <Paragraph typography="t6" fontWeight="bold" color={palette.ink}>
-              제{draw.drawNo}회 · {draw.date} 추첨
-            </Paragraph>
-            <div style={{ marginTop: 12 }}>
-              <LottoBalls numbers={draw.numbers} bonus={draw.bonusNo} />
-            </div>
-          </Card>
+          <div ref={coachRef}>
+            <Card style={{ marginTop: 8 }}>
+              <Paragraph typography="t6" fontWeight="bold" color={palette.ink}>
+                제{draw.drawNo}회 · {draw.date} 추첨
+              </Paragraph>
+              <div style={{ marginTop: 12 }}>
+                <LottoBalls numbers={draw.numbers} bonus={draw.bonusNo} />
+              </div>
+            </Card>
+          </div>
 
           <Card style={{ marginTop: 12 }}>
             <Paragraph typography="t6" fontWeight="bold" color={palette.ink}>

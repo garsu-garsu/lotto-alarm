@@ -9,6 +9,7 @@ import { EVENT, track } from "../../lib/analytics";
 import { fetchDraw, fetchLatestDraw, rankOf, type Draw, type Rank } from "../../lib/lotto";
 import { decodeQrFromDataUri, parseLottoQr, type LottoTicket } from "../../lib/qr";
 import { isInTossApp } from "../../lib/tossEnv";
+import { useTourTarget } from "../../lib/tour";
 import { palette } from "../../theme";
 
 const GAMES_KEY = "la:my-games";
@@ -48,6 +49,7 @@ type QrResultState =
 
 export function MyNumbersScreen() {
   const { openToast } = useToast();
+  const coachRef = useTourTarget("mynumbers-qr");
   const [selected, setSelected] = useState<number[]>([]);
   const [games, setGames] = useState<number[][]>(loadGames);
   const [draw, setDraw] = useState<Draw | null>(null);
@@ -188,31 +190,33 @@ export function MyNumbersScreen() {
       title="내 번호 확인"
       subtitle="산 번호를 저장해 두면 발표 직후 몇 등인지 알려드려요"
     >
-      <Card style={{ marginTop: 8 }}>
-        <Paragraph typography="t6" fontWeight="bold" color={palette.ink}>
-          용지 QR 찍어서 불러오기
-        </Paragraph>
-        <Paragraph typography="t7" color={palette.sub} style={{ marginTop: 4 }}>
-          번호 6개를 일일이 안 눌러도 돼요.
-        </Paragraph>
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <div style={{ flex: 1 }}>
-            <Button display="block" onClick={() => void onScanCamera()}>
-              QR 찍기
-            </Button>
+      <div ref={coachRef}>
+        <Card style={{ marginTop: 8 }}>
+          <Paragraph typography="t6" fontWeight="bold" color={palette.ink}>
+            용지 QR 찍어서 불러오기
+          </Paragraph>
+          <Paragraph typography="t7" color={palette.sub} style={{ marginTop: 4 }}>
+            번호 6개를 일일이 안 눌러도 돼요.
+          </Paragraph>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <div style={{ flex: 1 }}>
+              <Button display="block" onClick={() => void onScanCamera()}>
+                QR 찍기
+              </Button>
+            </div>
+            <div style={{ flex: 1 }}>
+              <Button
+                display="block"
+                variant="weak"
+                color="dark"
+                onClick={() => void onScanPhoto()}
+              >
+                사진에서 찾기
+              </Button>
+            </div>
           </div>
-          <div style={{ flex: 1 }}>
-            <Button
-              display="block"
-              variant="weak"
-              color="dark"
-              onClick={() => void onScanPhoto()}
-            >
-              사진에서 찾기
-            </Button>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
 
       {qrTicket && (
         <>
