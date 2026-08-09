@@ -1,0 +1,140 @@
+import { closeView, graniteEvent } from "@apps-in-toss/web-framework";
+import { useEffect } from "react";
+
+import "./App.css";
+import { BannerAd } from "./components/BannerAd";
+import { BottomNav } from "./components/BottomNav";
+import { AlarmScreen } from "./features/alarm/AlarmScreen";
+import { MyNumbersScreen } from "./features/mynumbers/MyNumbersScreen";
+import { RecommendScreen } from "./features/recommend/RecommendScreen";
+import { ResultScreen } from "./features/result/ResultScreen";
+import { trackScreen } from "./lib/analytics";
+import { RouterProvider, useRouter, type Route } from "./router";
+import { palette } from "./theme";
+
+/** BannerAd 가 잡아두는 높이 — 본문이 배너 뒤로 숨지 않게 같은 값만큼 비워둬요. */
+const BANNER_H = 96;
+
+function CurrentScreen() {
+  const { route } = useRouter();
+
+  switch (route.name) {
+    case "mynumbers":
+      return <MyNumbersScreen />;
+    case "recommend":
+      return <RecommendScreen />;
+    case "alarm":
+      return <AlarmScreen />;
+    default:
+      return <ResultScreen />;
+  }
+}
+
+function Shell() {
+  const { route, back, canGoBack } = useRouter();
+
+  useEffect(() => {
+    trackScreen(route.name);
+  }, [route.name]);
+
+  // 토스 네이티브 상단 바 뒤로가기를 앱 내 이동에 연결
+  useEffect(() => {
+    try {
+      return graniteEvent.addEventListener("backEvent", {
+        onEvent: () => {
+          if (canGoBack) back();
+          else
+            try {
+              closeView();
+            } catch {
+              /* noop */
+            }
+        },
+      });
+    } catch {
+      return undefined;
+    }
+  }, [back, canGoBack]);
+
+  // 우측 상단 닫기(홈) 버튼 — 어느 화면에 있든 앱을 닫아요.
+  // backEvent 만 구독하면 이 버튼을 아무도 처리하지 않아 눌러도 안 닫혀요.
+  useEffect(() => {
+    try {
+      return graniteEvent.addEventListener("homeEvent", {
+        onEvent: () => {
+          try {
+            void closeView();
+          } catch {
+            /* 브라우저 등 미지원 환경 */
+          }
+        },
+      });
+    } catch {
+      return undefined;
+    }
+  }, []);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100dvh",
+        overflow: "hidden",
+        background: palette.bg,
+        // 하단 고정 배너(96px + 안전영역)만큼 본문·탭 자리를 비워둬요.
+        // 이게 없으면 마지막 버튼이 배너에 가려요.
+        boxSizing: "border-box",
+        paddingBottom: `calc(${BANNER_H}px + env(safe-area-inset-bottom))`,
+      }}
+    >
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <CurrentScreen />
+      </div>
+      <BottomNav />
+
+      {/* 배너는 화면마다 따로 두지 않고 여기 하나만 띄워요 — 앱 전체에 배너는 하나입니다.
+          본문과 탭은 위 컨테이너의 paddingBottom 만큼 올라와 있어서 가려지지 않아요. */}
+      <div
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 10,
+          background: palette.bg,
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+        <BannerAd />
+      </div>
+    </div>
+  );
+}
+
+// 확인 알림은 딥링크로 들어올 수 있어요 — 경로 끝 조각과 ?screen= 둘 다 보고,
+// 모르는 값이면 평소대로 당첨번호 화면.
+function initialRoute(): Route {
+  try {
+    const { pathname, search } = window.location;
+    const screen =
+      new URLSearchParams(search).get("screen") ??
+      pathname.split("/").filter(Boolean).pop();
+    if (screen === "mynumbers" || screen === "recommend" || screen === "alarm") {
+      return { name: screen };
+    }
+  } catch {
+    /* noop */
+  }
+  return { name: "result" };
+}
+
+function App() {
+  return (
+    <RouterProvider initial={initialRoute()}>
+      <Shell />
+    </RouterProvider>
+  );
+}
+
+export default App;
