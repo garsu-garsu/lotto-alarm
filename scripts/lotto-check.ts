@@ -2,7 +2,7 @@
 // 네트워크를 타는 fetch* 함수는 호출하지 않는다(import만 함).
 import assert from "node:assert";
 import { rankOf, nextDrawAt, type Draw } from "../src/lib/lotto.ts";
-import { recommendGames } from "../src/lib/recommend.ts";
+import { recommendGames, type Strategy } from "../src/lib/recommend.ts";
 import { parseLottoQr } from "../src/lib/qr.ts";
 
 function makeDraw(): Draw {
@@ -57,16 +57,11 @@ const nextFrom2046 = nextDrawAt(sat2046);
 assert.strictEqual(nextFrom2046.toISOString(), new Date("2026-08-15T20:45:00+09:00").toISOString());
 
 // ---- recommendGames ----
-const draws: Draw[] = [
-  { ...makeDraw(), drawNo: 1, numbers: [1, 2, 3, 4, 5, 6] },
-  { ...makeDraw(), drawNo: 2, numbers: [1, 2, 3, 10, 11, 12] },
-];
-
-const a1 = recommendGames(draws, 5, 42);
-const a2 = recommendGames(draws, 5, 42);
+const a1 = recommendGames("uniform", 5, 42);
+const a2 = recommendGames("uniform", 5, 42);
 assert.deepStrictEqual(a1, a2, "같은 seed는 같은 결과여야 함");
 
-const b1 = recommendGames(draws, 5, 43);
+const b1 = recommendGames("uniform", 5, 43);
 assert.notDeepStrictEqual(a1, b1, "다른 seed는 다른 결과여야 함");
 
 for (const game of a1) {
@@ -76,11 +71,6 @@ for (const game of a1) {
   const sorted = [...game].sort((x, y) => x - y);
   assert.deepStrictEqual(game, sorted, "오름차순이어야 함");
 }
-
-// 빈 이력 폴백도 정상 동작해야 함
-const empty = recommendGames([], 3, 1);
-assert.strictEqual(empty.length, 3);
-for (const game of empty) assert.strictEqual(game.length, 6);
 
 // ---- parseLottoQr ----
 const fullUrl =
@@ -119,5 +109,57 @@ assert.strictEqual(
   ),
   null,
 ); // 게임 6개 초과
+
+// ---- recommendGames: 4가지 방식 점검 ----
+const sumOf = (g: number[]) => g.reduce((a, b) => a + b, 0);
+const oddCountOf = (g: number[]) => g.filter((n) => n % 2 === 1).length;
+const hasConsecutive = (g: number[]) => g.some((n, i) => i > 0 && n - g[i - 1] === 1);
+const strategies: Strategy[] = ["uniform", "lessCrowded", "typical", "spread"];
+
+for (const strategy of strategies) {
+  const s1 = recommendGames(strategy, 5, 100);
+  const s2 = recommendGames(strategy, 5, 100);
+  assert.deepStrictEqual(s1, s2, `${strategy}: 같은 seed는 같은 결과여야 함`);
+
+  const s3 = recommendGames(strategy, 5, 101);
+  assert.notDeepStrictEqual(s1, s3, `${strategy}: 다른 seed는 다른 결과여야 함`);
+
+  assert.strictEqual(s1.length, 5);
+  for (const game of s1) {
+    assert.strictEqual(game.length, 6);
+    assert.strictEqual(new Set(game).size, 6, `${strategy}: 중복 없어야 함`);
+    for (const n of game) assert.ok(n >= 1 && n <= 45, `${strategy}: 1~45 범위`);
+    assert.deepStrictEqual(game, [...game].sort((x, y) => x - y), `${strategy}: 오름차순이어야 함`);
+  }
+}
+
+// lessCrowded: 합계 160 이상 + 연속쌍 1개 이상 (기각 표집이 200게임 내내 조건을 지키는지)
+for (const game of recommendGames("lessCrowded", 200, 7)) {
+  assert.ok(sumOf(game) >= 160, "lessCrowded: 합계가 160 이상이어야 함");
+  assert.ok(hasConsecutive(game), "lessCrowded: 연속쌍이 있어야 함");
+}
+
+// typical: 홀수 정확히 3개 + 합계 121~160
+for (const game of recommendGames("typical", 200, 7)) {
+  assert.strictEqual(oddCountOf(game), 3, "typical: 홀수가 정확히 3개여야 함");
+  const s = sumOf(game);
+  assert.ok(s >= 121 && s <= 160, "typical: 합계가 121~160이어야 함");
+}
+
+// spread: 5게임(30개 번호)이 서로 겹치지 않아야 함
+const spread5 = recommendGames("spread", 5, 9);
+const flat5 = spread5.flat();
+assert.strictEqual(flat5.length, 30);
+assert.strictEqual(new Set(flat5).size, 30, "spread: 5게임 번호가 서로 겹치지 않아야 함");
+
+// spread: 8게임 요청 시에도 게임마다 6개·중복 없음 유지, 앞 7게임은 서로소
+const spread8 = recommendGames("spread", 8, 9);
+assert.strictEqual(spread8.length, 8);
+for (const game of spread8) {
+  assert.strictEqual(game.length, 6);
+  assert.strictEqual(new Set(game).size, 6);
+}
+const first7Flat = spread8.slice(0, 7).flat();
+assert.strictEqual(new Set(first7Flat).size, 42, "spread: 앞 7게임은 서로소여야 함");
 
 console.log("lotto-check ok");
