@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 
+import { Device } from "@apps-in-toss/web-framework";
 import { Button, Paragraph, useToast } from "@toss/tds-mobile";
 
 import { LottoBall, LottoBalls } from "../../components/LottoBalls";
 import { Card, ScreenLayout } from "../../components/ScreenLayout";
 import { EVENT, track } from "../../lib/analytics";
-import { fetchLatestDraw, rankOf, type Draw, type Rank } from "../../lib/lotto";
+import { fetchDraw, fetchLatestDraw, rankOf, type Draw, type Rank } from "../../lib/lotto";
+import { decodeQrFromDataUri, parseLottoQr, type LottoTicket } from "../../lib/qr";
+import { isInTossApp } from "../../lib/tossEnv";
 import { palette } from "../../theme";
 
 const GAMES_KEY = "la:my-games";
@@ -36,11 +39,21 @@ const RANK_LABEL: Record<Exclude<Rank, null>, string> = {
   5: "5등",
 };
 
+const QR_FAIL_TOAST = "QR을 읽지 못했어요. 용지를 밝은 곳에서 QR이 화면에 꽉 차게 찍어주세요.";
+
+type QrResultState =
+  | { status: "loading" }
+  | { status: "ready"; draw: Draw }
+  | { status: "notDrawn" };
+
 export function MyNumbersScreen() {
   const { openToast } = useToast();
   const [selected, setSelected] = useState<number[]>([]);
   const [games, setGames] = useState<number[][]>(loadGames);
   const [draw, setDraw] = useState<Draw | null>(null);
+  const [qrBusy, setQrBusy] = useState(false);
+  const [qrTicket, setQrTicket] = useState<LottoTicket | null>(null);
+  const [qrResult, setQrResult] = useState<QrResultState | null>(null);
   // 회차 대조가 끝난 뒤 딱 한 번만 기록하기 위한 플래그
   const checkedRef = useRef(false);
 
@@ -67,6 +80,83 @@ export function MyNumbersScreen() {
       }
       return [...prev, n].sort((a, b) => a - b);
     });
+  };
+
+  // QR 로 읽은 게임들을 저장 목록에 합치고, 그 회차 결과를 바로 보여줘요.
+  const importTicket = async (ticket: LottoTicket) => {
+    const added: number[][] = [];
+    for (const game of ticket.games) {
+      const key = game.join(",");
+      const dup =
+        games.some((g) => g.join(",") === key) || added.some((g) => g.join(",") === key);
+      if (!dup) added.push(game);
+    }
+    const room = Math.max(0, MAX_GAMES - games.length);
+    const toSave = added.slice(0, room);
+    if (toSave.length > 0) {
+      const next = [...games, ...toSave];
+      setGames(next);
+      saveGames(next);
+    }
+    if (toSave.length === 0) {
+      openToast(added.length === 0 ? "이미 저장된 번호예요." : `최대 ${MAX_GAMES}게임까지 저장돼요.`);
+    } else if (toSave.length < added.length) {
+      openToast(`${toSave.length}게임만 담았어요. 최대 ${MAX_GAMES}게임까지 저장돼요.`);
+    } else {
+      openToast(`${toSave.length}게임을 불러왔어요.`);
+    }
+    track(EVENT.qrImported, { drawNo: ticket.drawNo, games: ticket.games.length });
+
+    setQrTicket(ticket);
+    setQrResult({ status: "loading" });
+    fetchDraw(ticket.drawNo)
+      .then((d) => setQrResult({ status: "ready", draw: d }))
+      .catch(() => setQrResult({ status: "notDrawn" })); // 추첨 전이면 404
+  };
+
+  const scanQr = async (dataUri: string) => {
+    const text = await decodeQrFromDataUri(dataUri);
+    const ticket = text ? parseLottoQr(text) : null;
+    if (!ticket) {
+      openToast(QR_FAIL_TOAST);
+      return;
+    }
+    await importTicket(ticket);
+  };
+
+  const onScanCamera = async () => {
+    if (qrBusy) return;
+    if (!isInTossApp()) {
+      openToast("토스 앱에서 열면 QR을 찍을 수 있어요.");
+      return;
+    }
+    setQrBusy(true);
+    try {
+      const img = await Device.openCamera({ base64: true, maxWidth: 2048 });
+      await scanQr(img.dataUri);
+    } catch {
+      openToast("카메라를 사용할 수 없어요. 권한을 확인해 주세요.");
+    } finally {
+      setQrBusy(false);
+    }
+  };
+
+  const onScanPhoto = async () => {
+    if (qrBusy) return;
+    if (!isInTossApp()) {
+      openToast("토스 앱에서 열면 QR을 찍을 수 있어요.");
+      return;
+    }
+    setQrBusy(true);
+    try {
+      const imgs = await Device.getPhotos({ base64: true, maxCount: 1, maxWidth: 2048 });
+      if (imgs.length === 0) return; // 선택 취소
+      await scanQr(imgs[0].dataUri);
+    } catch {
+      openToast("사진을 불러올 수 없어요. 권한을 확인해 주세요.");
+    } finally {
+      setQrBusy(false);
+    }
   };
 
   const onSave = () => {
@@ -99,6 +189,77 @@ export function MyNumbersScreen() {
       subtitle="산 번호를 저장해 두면 발표 직후 몇 등인지 알려드려요"
     >
       <Card style={{ marginTop: 8 }}>
+        <Paragraph typography="t6" fontWeight="bold" color={palette.ink}>
+          용지 QR 찍어서 불러오기
+        </Paragraph>
+        <Paragraph typography="t7" color={palette.sub} style={{ marginTop: 4 }}>
+          번호 6개를 일일이 안 눌러도 돼요.
+        </Paragraph>
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <div style={{ flex: 1 }}>
+            <Button display="block" onClick={() => void onScanCamera()}>
+              QR 찍기
+            </Button>
+          </div>
+          <div style={{ flex: 1 }}>
+            <Button
+              display="block"
+              variant="weak"
+              color="dark"
+              onClick={() => void onScanPhoto()}
+            >
+              사진에서 찾기
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      {qrTicket && (
+        <>
+          <Paragraph
+            typography="t6"
+            fontWeight="bold"
+            color={palette.ink}
+            style={{ marginTop: 20 }}
+          >
+            제{qrTicket.drawNo}회 결과
+          </Paragraph>
+          {qrResult?.status === "notDrawn" && (
+            <Card style={{ marginTop: 12 }}>
+              <Paragraph typography="t7" color={palette.sub}>
+                아직 추첨 전이에요. 저장해뒀다가 발표되면 확인해 보세요.
+              </Paragraph>
+            </Card>
+          )}
+          {qrResult?.status === "ready" &&
+            qrTicket.games.map((game, i) => {
+              const rank = rankOf(game, qrResult.draw);
+              return (
+                <Card
+                  key={i}
+                  style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 12 }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <LottoBalls
+                      numbers={game}
+                      size={30}
+                      dim={(n) => !qrResult.draw.numbers.includes(n)}
+                    />
+                  </div>
+                  <Paragraph
+                    typography="t7"
+                    fontWeight="bold"
+                    color={rank ? palette.good : palette.sub}
+                  >
+                    {rank ? `${RANK_LABEL[rank]} 🎉` : "낙첨"}
+                  </Paragraph>
+                </Card>
+              );
+            })}
+        </>
+      )}
+
+      <Card style={{ marginTop: 20 }}>
         <Paragraph typography="t6" fontWeight="bold" color={palette.ink}>
           번호 6개를 골라주세요 ({selected.length}/6)
         </Paragraph>

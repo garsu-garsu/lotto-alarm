@@ -41,4 +41,5 @@ export const EVENT = {
   myNumbersSaved: "my_numbers_saved",
   myNumbersChecked: "my_numbers_checked",
   recommendGenerated: "recommend_generated",
+  qrImported: "qr_imported",
 } as const;

@@ -3,6 +3,7 @@
 import assert from "node:assert";
 import { rankOf, nextDrawAt, type Draw } from "../src/lib/lotto.ts";
 import { recommendGames } from "../src/lib/recommend.ts";
+import { parseLottoQr } from "../src/lib/qr.ts";
 
 function makeDraw(): Draw {
   return {
@@ -80,5 +81,43 @@ for (const game of a1) {
 const empty = recommendGames([], 3, 1);
 assert.strictEqual(empty.length, 3);
 for (const game of empty) assert.strictEqual(game.length, 6);
+
+// ---- parseLottoQr ----
+const fullUrl =
+  "https://m.dhlottery.co.kr/qr.do?method=winQr&v=1195m060713162425m050912202126m051820364243m051427303943m1527333436370000000645.net";
+const ticket = parseLottoQr(fullUrl);
+assert.ok(ticket);
+assert.strictEqual(ticket.drawNo, 1195);
+assert.strictEqual(ticket.games.length, 5);
+assert.deepStrictEqual(ticket.games[0], [6, 7, 13, 16, 24, 25]);
+assert.deepStrictEqual(ticket.games[4], [15, 27, 33, 34, 36, 37]);
+
+const oneGame = parseLottoQr("1107m061430314041");
+assert.ok(oneGame);
+assert.strictEqual(oneGame.drawNo, 1107);
+assert.strictEqual(oneGame.games.length, 1);
+assert.deepStrictEqual(oneGame.games[0], [6, 14, 30, 31, 40, 41]);
+
+// v= 없이 payload 만 줘도 동일하게 파싱돼야 함
+const payloadOnly = parseLottoQr(
+  "1195m060713162425m050912202126m051820364243m051427303943m1527333436370000000645.net",
+);
+assert.deepStrictEqual(payloadOnly, ticket);
+
+// 구분 문자가 m 이 아니어도 파싱돼야 함
+const otherSep = parseLottoQr("1107q061430314041");
+assert.deepStrictEqual(otherSep, oneGame);
+
+// 잘못된 입력은 전부 null
+assert.strictEqual(parseLottoQr(""), null); // 빈 문자열
+assert.strictEqual(parseLottoQr("1195"), null); // 게임 0개
+assert.strictEqual(parseLottoQr("1107m064630314041"), null); // 46 이상 포함
+assert.strictEqual(parseLottoQr("1107m061414314041"), null); // 한 게임 안 중복
+assert.strictEqual(
+  parseLottoQr(
+    "1107m061430314041m061430314042m061430314043m061430314044m061430314045m061430314046",
+  ),
+  null,
+); // 게임 6개 초과
 
 console.log("lotto-check ok");
