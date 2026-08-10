@@ -17,17 +17,17 @@ export type NotifyConsent =
 
 /** 로또 사라고 알려주는 알림 — 추첨(토 20:45) 전에 살 시간이 남는 시각만 넣었어요. */
 export const BUY_SLOTS = [
-  { code: "lotto-alarm-buy-fri1900", label: "금요일 저녁 7시" },
-  { code: "lotto-alarm-buy-sat1000", label: "토요일 오전 10시" },
-  { code: "lotto-alarm-buy-sat1400", label: "토요일 오후 2시" },
-  { code: "lotto-alarm-buy-sat1800", label: "토요일 오후 6시" },
+  { code: "lotto-alarm-buy-fri1900-p", label: "금요일 저녁 7시" },
+  { code: "lotto-alarm-buy-sat1000-p", label: "토요일 오전 10시" },
+  { code: "lotto-alarm-buy-sat1400-p", label: "토요일 오후 2시" },
+  { code: "lotto-alarm-buy-sat1800-p", label: "토요일 오후 6시" },
 ] as const;
 
 /** 번호 확인하라고 알려주는 알림. 20:50 은 발표 직후, 나머지는 다음날 아침이에요. */
 export const CHECK_SLOTS = [
-  { code: "lotto-alarm-check-sat2050", label: "토요일 밤 8시 50분" },
-  { code: "lotto-alarm-check-sun0800", label: "일요일 오전 8시" },
-  { code: "lotto-alarm-check-sun1000", label: "일요일 오전 10시" },
+  { code: "lotto-alarm-check-sat2050-p", label: "토요일 밤 8시 50분" },
+  { code: "lotto-alarm-check-sun0800-p", label: "일요일 오전 8시" },
+  { code: "lotto-alarm-check-sun1000-p", label: "일요일 오전 10시" },
 ] as const;
 
 export type NotifySlotCode =
