@@ -35,7 +35,6 @@ export const EVENT = {
   adRewarded: "ad_rewarded",
   adBannerImpression: "ad_banner_impression",
   notifyConsent: "notify_consent",
-  shareCompleted: "share_completed",
   // 앱 고유
   resultViewed: "result_viewed",
   myNumbersSaved: "my_numbers_saved",
