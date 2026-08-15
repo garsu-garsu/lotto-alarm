@@ -5,7 +5,6 @@ export const palette = {
   gold: "#F4B740",
   ink: "#231A18",
   sub: "#7A6F6C",
-  line: "rgba(232,69,44,0.12)",
   card: "#FFFFFF",
   bg: "#FFF7F5",
   white: "#FFFFFF",
